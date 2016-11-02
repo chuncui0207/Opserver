@@ -64,13 +64,13 @@ namespace StackExchange.Opserver.Data.Dashboard.Providers
 
                 var staticDataCache = ProviderCache(
                     () => node.PollNodeInfoAsync(), 
-                    _config.StaticDataTimeoutSeconds,
+                    _config.StaticDataTimeoutSeconds.Seconds(),
                     memberName: node.Name + "-Static");
                 node.Caches.Add(staticDataCache);
 
                 node.Caches.Add(ProviderCache(
                     () => node.PollStats(), 
-                    _config.DynamicDataTimeoutSeconds,
+                    _config.DynamicDataTimeoutSeconds.Seconds(),
                     memberName: node.Name + "-Dynamic"));
 
                 //Force update static host data, incuding os info, volumes, interfaces.
@@ -100,7 +100,7 @@ namespace StackExchange.Opserver.Data.Dashboard.Providers
 
         protected override string GetMonitorStatusReason() => null;
 
-        public override bool HasData => DataPollers.Any(x => x.HasData());
+        public override bool HasData => DataPollers.Any(x => x.ContainsData);
 
         public override List<Node> AllNodes { get; }
     }

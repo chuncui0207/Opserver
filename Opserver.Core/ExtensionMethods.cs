@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.ComponentModel;
 using System.IO;
 using System.Linq;
 using System.Net;
@@ -14,7 +13,6 @@ using StackExchange.Opserver.Data;
 using StackExchange.Opserver.Helpers;
 using StackExchange.Profiling;
 using StackExchange.Redis;
-using UnconstrainedMelody;
 
 namespace StackExchange.Opserver
 {
@@ -77,15 +75,7 @@ namespace StackExchange.Opserver
         /// <summary>
         /// A brain dead pluralizer. 1.Pluralize("time") => "1 time"
         /// </summary>
-        public static string Pluralize(this int count, string name, bool includeNumber = true)
-        {
-            var numString = includeNumber ? count.ToComma() + " " : null;
-            if (count == 1) return numString + name;
-            if (name.EndsWith("y")) return numString + name.Remove(name.Length - 1) + "ies";
-            if (name.EndsWith("s")) return numString + name.Remove(name.Length - 1) + "es";
-            if (name.EndsWith("ex")) return numString + name + "es";
-            return numString + name + "s";
-        }
+        public static string Pluralize(this int count, string name, bool includeNumber = true) => Pluralize((long)count, name, includeNumber);
 
         /// <summary>
         /// A brain dead pluralizer. 1.Pluralize("time") => "1 time"
@@ -147,8 +137,6 @@ namespace StackExchange.Opserver
             return s.EndsWith("/") ? s : $"{s}/";
         }
 
-        public static bool HasData(this Cache cache) => cache != null && cache.ContainsData;
-
         public static T SafeData<T>(this Cache<T> cache, bool emptyIfMissing = false) where T : class, new() =>
             cache?.Data ?? (emptyIfMissing ? new T() : null);
 
@@ -158,8 +146,9 @@ namespace StackExchange.Opserver
         public static string GetReasonSummary(this IEnumerable<IMonitorStatus> items) =>
             string.Join(", ", items.WithIssues().Select(i => i.MonitorStatusReason));
 
-        public static MonitorStatus GetWorstStatus(this IEnumerable<IMonitorStatus> ims, string cacheKey = null, int durationSeconds = 5)
+        public static MonitorStatus GetWorstStatus(this IEnumerable<IMonitorStatus> ims, string cacheKey = null, TimeSpan? duration = null)
         {
+            duration = duration ?? 5.Seconds();
             if (ims == null)
                 return MonitorStatus.Unknown;
             MonitorStatus? result = null;
@@ -169,7 +158,7 @@ namespace StackExchange.Opserver
             {
                 result = GetWorstStatus(ims.Select(i => i.MonitorStatus));
                 if (cacheKey.HasValue())
-                    Current.LocalCache.Set(cacheKey, result, durationSeconds);
+                    Current.LocalCache.Set(cacheKey, result, duration);
             }
             return result.Value;
         }
@@ -383,7 +372,7 @@ namespace StackExchange.Opserver
         /// Note that one unlucky caller when the data is stale will block to fill the cache,
         /// everybody else will get stale data though.
         /// </summary>
-        public static T GetSet<T>(this LocalCache cache, string key, Func<T, MicroContext, T> lookup, int durationSecs, int serveStaleDataSecs)
+        public static T GetSet<T>(this LocalCache cache, string key, Func<T, MicroContext, T> lookup, TimeSpan duration, TimeSpan staleDuration)
             where T : class
         {
             var possiblyStale = cache.Get<GetSetWrapper<T>>(key);
@@ -407,10 +396,10 @@ namespace StackExchange.Opserver
                         possiblyStale = new GetSetWrapper<T>
                         {
                             Data = data,
-                            StaleAfter = DateTime.UtcNow + TimeSpan.FromSeconds(durationSecs)
+                            StaleAfter = DateTime.UtcNow + duration
                         };
 
-                        cache.Set(key, possiblyStale, durationSecs + serveStaleDataSecs);
+                        cache.Set(key, possiblyStale, duration + staleDuration);
                         Interlocked.Increment(ref totalGetSetSync);
                     }
                 }
@@ -444,10 +433,10 @@ namespace StackExchange.Opserver
                             using (var ctx = new MicroContext())
                             {
                                 updated.Data = lookup(old, ctx);
-                                updated.StaleAfter = DateTime.UtcNow + TimeSpan.FromSeconds(durationSecs);
+                                updated.StaleAfter = DateTime.UtcNow + duration;
                             }
                             cache.Remove(key);
-                            cache.Set(key, updated, durationSecs + serveStaleDataSecs);
+                            cache.Set(key, updated, duration + staleDuration);
                         }
                         finally
                         {

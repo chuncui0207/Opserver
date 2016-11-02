@@ -8,7 +8,7 @@ using StackExchange.Profiling;
 
 namespace StackExchange.Opserver.Data.HAProxy
 {
-    public class HAProxyInstance : PollNode
+    public partial class HAProxyInstance : PollNode, INodeRoleProvider
     {
         public string Name => Settings.Name;
         public string Description => Settings.Description;
@@ -62,24 +62,14 @@ namespace StackExchange.Opserver.Data.HAProxy
         }
 
         private Cache<List<Proxy>> _proxies;
-        public Cache<List<Proxy>> Proxies
-        {
-            get
-            {
-                return _proxies ?? (_proxies = new Cache<List<Proxy>>
-                    {
-                        CacheForSeconds = 10,
-                        UpdateCache = UpdateCacheItem(
-                            description: "HAProxy Fetch: " + Name,
-                            getData: FetchHAProxyStatsAsync,
-                            addExceptionData:
-                                e =>
-                                e.AddLoggedData("Server", Name)
-                                 .AddLoggedData("Url", Url)
-                                 .AddLoggedData("QueryTimeout", QueryTimeoutMs.ToString()))
-                    });
-            }
-        }
+        public Cache<List<Proxy>> Proxies =>
+            _proxies ?? (_proxies = new Cache<List<Proxy>>(this, "HAProxy Fetch: " + Name,
+                cacheDuration: 10.Seconds(),
+                getData: FetchHAProxyStatsAsync,
+                addExceptionData: e => e.AddLoggedData("Server", Name)
+                    .AddLoggedData("Url", Url)
+                    .AddLoggedData("QueryTimeout", QueryTimeoutMs.ToString())
+            ));
 
         private async Task<List<Proxy>> FetchHAProxyStatsAsync()
         {

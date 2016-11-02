@@ -10,7 +10,7 @@ namespace StackExchange.Opserver.Data.Dashboard.Providers
 {
     public class OrionDataProvider : DashboardDataProvider<OrionSettings>
     {
-        public override bool HasData => NodeCache.HasData();
+        public override bool HasData => NodeCache.ContainsData;
         public string Host => Settings.Host;
         public int QueryTimeoutMs => Settings.QueryTimeoutMs;
         public override int MinSecondsBetweenPolls => 5;
@@ -29,7 +29,7 @@ namespace StackExchange.Opserver.Data.Dashboard.Providers
         public override List<Node> AllNodes => NodeCache.Data ?? new List<Node>();
 
         private Cache<List<Node>> _nodeCache;
-        public Cache<List<Node>> NodeCache => _nodeCache ?? (_nodeCache = ProviderCache(GetAllNodesAsync, 10));
+        public Cache<List<Node>> NodeCache => _nodeCache ?? (_nodeCache = ProviderCache(GetAllNodesAsync, 10.Seconds()));
 
         public async Task<List<Node>> GetAllNodesAsync()
         {

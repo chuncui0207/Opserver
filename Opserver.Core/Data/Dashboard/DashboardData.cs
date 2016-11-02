@@ -42,7 +42,7 @@ namespace StackExchange.Opserver.Data.Dashboard
             _dataProviders.ForEach(p => p.TryAddToGlobalPollers());
         }
 
-        public static bool AnyDoingFirstPoll => _dataProviders.Any(p => p.FirstPollRun != null);
+        public static bool AnyDoingFirstPoll => _dataProviders.Any(p => p.LastPoll == null);
 
         public static ReadOnlyCollection<DashboardDataProvider> DataProviders => _dataProviders.AsReadOnly();
 
@@ -66,7 +66,7 @@ namespace StackExchange.Opserver.Data.Dashboard
 
         public static IEnumerable<Node> GetNodesByIP(IPAddress ip)
         {
-            return _dataProviders.Count == 0
+            return _dataProviders.Count == 1
                 ? _dataProviders[0].GetNodesByIP(ip)
                 : _dataProviders.SelectMany(p => p.GetNodesByIP(ip));
         }

@@ -9,7 +9,7 @@ namespace StackExchange.Opserver.Data.Dashboard.Providers
     public partial class BosunDataProvider
     {
         private Cache<List<Node>> _nodeCache;
-        public Cache<List<Node>> NodeCache => _nodeCache ?? (_nodeCache = ProviderCache(GetAllNodesAsync, 60, 4 * 60 * 60));
+        public Cache<List<Node>> NodeCache => _nodeCache ?? (_nodeCache = ProviderCache(GetAllNodesAsync, 60.Seconds(), 4.Hours()));
 
         private Cache<Dictionary<string, List<string>>> _nodeMetricCache;
 
@@ -20,7 +20,7 @@ namespace StackExchange.Opserver.Data.Dashboard.Providers
                     var response = await GetFromBosunAsync<Dictionary<string, List<string>>>(GetUrl("api/metric/host"))
                         .ConfigureAwait(false);
                     return response.Result ?? new Dictionary<string, List<string>>();
-                }, 10*60, 4*60*60));
+                }, 10.Minutes(), 4.Hours()));
 
         public async Task<List<Node>> GetAllNodesAsync()
         {
@@ -106,7 +106,7 @@ namespace StackExchange.Opserver.Data.Dashboard.Providers
                             Title = n.PrettyName,
                             Date = i.LastAbnormalTime.ToDateTime(),
                             Description = i.Subject,
-                            MonitorStatus = GetStatusFromString(i.Status)
+                            MonitorStatus = i.Active ? MonitorStatus.Good : GetStatusFromString(i.Status)
                         }).ToList();
                     }
 
@@ -288,7 +288,7 @@ namespace StackExchange.Opserver.Data.Dashboard.Providers
 
         private NodeStatus GetNodeStatus(BosunHost host)
         {
-            if (host.OpenIncidents?.Count > 0)
+            if (host.OpenIncidents?.Count(i => i.Active) > 0)
                 return NodeStatus.Warning;
             if (host.ICMPData?.Values.All(p => p.TimedOut) == true)
                 return NodeStatus.Unreachable;

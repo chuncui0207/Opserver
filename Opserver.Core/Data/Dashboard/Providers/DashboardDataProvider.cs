@@ -17,12 +17,11 @@ namespace StackExchange.Opserver.Data.Dashboard.Providers
         }
     }
 
-    public abstract class DashboardDataProvider : PollNode, IIssuesProviderInstance
+    public abstract class DashboardDataProvider : PollNode, IIssuesProvider
     {
         public abstract bool HasData { get; }
         public string Name { get; protected set; }
         
-        public bool Enabled => true;
         public virtual IEnumerable<Issue> GetIssues()
         {
             foreach (var n in AllNodes)
@@ -44,7 +43,6 @@ namespace StackExchange.Opserver.Data.Dashboard.Providers
         protected DashboardDataProvider(IProviderSettings settings) : base(settings.Name + "Dashboard")
         {
             Name = settings.Name;
-            IssueProvider.AddProvider(this);
         }
 
         /// <summary>
@@ -91,38 +89,29 @@ namespace StackExchange.Opserver.Data.Dashboard.Providers
         public Application GetApplication(string id) => AllNodes.SelectMany(n => n.Apps.Where(a => a.Id == id)).FirstOrDefault();
 
         #endregion
-
-        #region Cache
-
+        
         protected Cache<T> ProviderCache<T>(
             Func<Task<T>> fetch,
-            int cacheSeconds,
-            int? cacheFailureSeconds = null,
+            TimeSpan cacheDuration,
+            TimeSpan? cacheFailureDuration = null,
             bool affectsStatus = true,
             [CallerMemberName] string memberName = "",
             [CallerFilePath] string sourceFilePath = "",
             [CallerLineNumber] int sourceLineNumber = 0)
             where T : class
         {
-            // ReSharper disable ExplicitCallerInfoArgument
-            return new Cache<T>(memberName, sourceFilePath, sourceLineNumber)
+            return new Cache<T>(this,
+                "Data Provieder Fetch: " + NodeType + ":" + typeof(T).Name,
+                cacheDuration,
+                fetch,
+                addExceptionData: e => e.AddLoggedData("NodeType", NodeType),
+                memberName: memberName,
+                sourceFilePath: sourceFilePath,
+                sourceLineNumber: sourceLineNumber)
             {
                 AffectsNodeStatus = affectsStatus,
-                CacheForSeconds = cacheSeconds,
-                CacheFailureForSeconds = cacheFailureSeconds,
-                UpdateCache = UpdateFromProvider(typeof (T).Name + "-List", fetch)
+                CacheFailureDuration = cacheFailureDuration
             };
-            // ReSharper restore ExplicitCallerInfoArgument
         }
-
-        public Func<Cache<T>, Task> UpdateFromProvider<T>(string opName, Func<Task<T>> fetch) where T : class
-        {
-            return UpdateCacheItem(description: "Data Provieder Fetch: " + NodeType + ":" + opName,
-                                   getData: fetch,
-                                   addExceptionData: e => e.AddLoggedData("NodeType", NodeType),
-                                   logExceptions: true);
-        }
-
-        #endregion
     }
 }

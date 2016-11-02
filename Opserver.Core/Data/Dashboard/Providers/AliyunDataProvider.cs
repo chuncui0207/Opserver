@@ -22,14 +22,14 @@ namespace StackExchange.Opserver.Data.Dashboard.Providers
             get { yield return NodeCache; }
         }
 
-        public override bool HasData => NodeCache.HasData();
+        public override bool HasData => DataPollers.Any(x => x.ContainsData);
 
         public override int MinSecondsBetweenPolls => 10;
 
         public override string NodeType => "Aliyun";
 
         private Cache<List<Node>> _nodeCache;
-        public Cache<List<Node>> NodeCache => _nodeCache ?? (_nodeCache = ProviderCache(GetAllAliyunNodesAsync, 60));
+        public Cache<List<Node>> NodeCache => _nodeCache ?? (_nodeCache = ProviderCache(GetAllAliyunNodesAsync, 60.Seconds()));
 
         public AliyunDataProvider(AliyunSettings settings) : base(settings)
         { }
